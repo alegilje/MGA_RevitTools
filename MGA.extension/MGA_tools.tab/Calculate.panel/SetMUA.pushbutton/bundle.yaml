@@ -1,0 +1,45 @@
+# encoding: utf-8
+title: Get Area Filed Region
+tooltip: 
+  Date: 06.08.2025
+  en_us: |
+      Description:
+        NB! Det forutsetter at Shared parameteret "Areal" finnes på filled region i prosjektet.
+        Set Areal parameteret eller/Omkrets parameteret i filled 
+        region basert på parameteret: Comments
+
+        Du skriver inn hva Comments parameteret i filled region skal 
+        inneholde for at du skal hente area eller omkrets.
+
+        Det kan ver bare deler av ordet i Comments eller hele ordet.
+
+        Eksempel:
+        Viewet inneholder filled region med Comments 'MUA 1', 
+        'MUA 2' og 'MUA 3'.
+
+        Dersom du ønsker at alle filled region med 
+        'MUA' i Comments skal hentes, skriver du 'MUA' i feltet. 
+        Da vil alle filled region,
+        'MUA 1', 'MUA 2' og 'MUA 3' bli hentet 
+        og satt parameter på.
+
+        Dersom du ønsker at alle filled region med 'MUA 1' 
+        i Comments
+        skal hentes, skriver du 'MUA 1' i feltet. Da vil bare 'MUA 1' 
+        bli hentet og satt parameter på.
+
+      Version: 2.0
+      Author: Alexander Gilje
+
+
+  version: "2.0"
+
+
+
+
+Last Update: 2025
+
+
+
+Author: Alexander Gilje
+
