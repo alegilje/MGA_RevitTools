@@ -1,0 +1,14 @@
+# encoding: utf-8
+title: Move Window Tags
+tooltip:
+  Date: 12.09.2025
+  en_us: |
+    Moves window tags to the exterior side of the window.
+    In plan view
+
+version: "2.0"
+
+Last Update: 2025
+Author: Alexander Gilje
+
+

@@ -1,0 +1,15 @@
+# encoding: utf-8
+title: Total Shear-Wall Length
+tooltip:
+  Date: 12.09.2025
+  en_us: |
+    Sums the measured lengths of all dimensions of the selected Dimension Type.
+    Select a Dimension Type and the tool totals the values across the model.
+    The result is reported in meters..
+
+version: "2.0"
+
+Last Update: 2025
+Author: Robert Kristiansen, Alexander Gilje
+
+

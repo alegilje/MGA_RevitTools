@@ -1,0 +1,12 @@
+# encoding: utf-8
+title: Detail Collector
+tooltip:
+  Date: 12.09.2025
+  en_us: |
+    Scans all Text Notes for construction-detail references. Matches are resolved against Boligbank\…\Byggedetaljer, and the corresponding files are bundled into a ZIP saved to Downloads.
+    
+
+version: "2.0"
+
+Last Update: 2025
+Author: Robert Kristiansen, Alexander Gilje

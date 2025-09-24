@@ -1,0 +1,12 @@
+# encoding: utf-8
+title: Move Window and Doors Tags
+tooltip:
+  Date: 12.09.2025
+  en_us: |
+    Move window and door tags to the exterior side of the door in plan view.
+
+version: "2.0"
+
+Last Update: 2025
+Author: Alexander Gilje
+

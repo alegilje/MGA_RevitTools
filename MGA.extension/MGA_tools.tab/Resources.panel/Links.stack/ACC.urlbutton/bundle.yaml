@@ -1,0 +1,10 @@
+# encoding: utf-8
+title: ACC
+tooltip: 
+  Date: 06.08.2025
+  en_us: |
+      Opens the website ACC.
+
+hyperlink: "https://acc.autodesk.eu/projects"
+context: zero-doc
+Author: Alexander Gilje

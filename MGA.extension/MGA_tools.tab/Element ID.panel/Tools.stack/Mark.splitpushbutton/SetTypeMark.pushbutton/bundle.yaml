@@ -1,0 +1,17 @@
+title: Renumber DoorID/WindowID
+tooltip: 
+  Date: 06.08.2025
+  en_us: |
+    Description:
+      Change the Type Mark on
+      all window/door types. 
+      Window: From V-1 and up.
+      Door: (Type)-1 and up.
+        Type = Two first letter.
+        Example: BD-1
+
+      Author: Alexander Gilje
+
+
+
+Author: Alexander Gilje

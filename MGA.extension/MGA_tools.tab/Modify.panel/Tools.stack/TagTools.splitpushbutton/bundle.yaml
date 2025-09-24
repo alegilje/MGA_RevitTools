@@ -1,0 +1,7 @@
+# encoding: utf-8
+title: Move tags
+layout:
+  - MoveDoorWindowTags
+  - MoveDoorTags
+  - MoveWindowTags
+highlight: new

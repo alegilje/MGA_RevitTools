@@ -1,0 +1,14 @@
+title: Renumber Framing Elements ID
+
+tooltip:
+  Date: 06.08.2025            # keep or update as needed
+  en_us: |
+    Assigns consecutive “Mark” values to selected **Structural Framing** elements,
+    grouped first by *Type Name* and then by *rounded Length (m)*.
+
+    ── Usage ──────────────────────────────────────────
+      • Switch to an appropriate 3D or plan view.  
+      • Select the beams/joists you wish to number.  
+      • Run the tool — each group receives a unique Mark starting at 1.  
+      • Re-run after model changes to keep numbering consistent.  
+      • Repeat for other types of structural framing elements.
