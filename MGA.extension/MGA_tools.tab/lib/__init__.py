@@ -10,7 +10,11 @@ from tools._file_magement import open_first_file_with_prefix
 from formsWindow._forms import dialogwindow_TextInput
 from formsWindow._forms import InputForm, InputElement, OutputForm
 
-
+from.Snippets._convert import convert_internal_to_mm
+from.Snippets._convert import convert_mm_to_internal
+from.Snippets._convert import convert_m_to_internal
+from.Snippets._convert import convert_length_to_internal
+from.Snippets._convert import get_length_units
 
 from pybase64 import standard_b64decode
 from pybase64 import standard_b64encode
