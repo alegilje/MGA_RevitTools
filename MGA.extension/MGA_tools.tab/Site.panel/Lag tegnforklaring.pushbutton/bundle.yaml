@@ -1,0 +1,23 @@
+# encoding: utf-8
+title: Lag tegnforklaring
+tooltip:
+  Date: 30.09.2025
+  en_us: |
+      Genererer tegnforklaring til viewet. 
+      Inkluderer farger fra Toposolids,Filled Regions og View Filters.
+
+      Begrensninger:
+      • Fungerer kun i Floor Plan views.  
+      • Krever MGA Revit Site-malen (fra og med 2026).  
+
+      Tilpasning:
+      Dersom du ønsker å inkludere en ekstra Toposolid-type i tegnforklaringen, 
+      må du opprette en tilsvarende Filled Region-type.  
+      I type properties for Toposoliden, under parameteren "View Filter", 
+      angir du navnet på Filled Region-typen som skal vises i tegnforklaringen.
+
+  version: "2.0"
+
+Last Update: 2025
+
+Author: Alexander Gilje
