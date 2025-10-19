@@ -29,6 +29,7 @@ from System.Windows.Forms import FolderBrowserDialog, DialogResult
 #----------------------- AUTODESK REVIT / PYREVIT IMPORTS -----------------------------#
 from pyrevit import revit, DB, forms
 from Autodesk.Revit.DB import *
+from Autodesk.Revit.DB import *
 
 
 
@@ -59,12 +60,6 @@ def main():
     
     xaml_path = os.path.join(os.path.dirname(__file__), "FormUI.xaml")
     DwgExportWindow(xaml_path).ShowDialog()
-
-def _lookup_param(element, param_name):
-    try:
-        return element.LookupParameter(param_name).AsString()
-    except:
-        return None
     
 
 #  ____  _     ____  ____  ____  _____ ____ 
@@ -115,7 +110,6 @@ class DwgExportWindow(forms.WPFWindow):
         s_number       = self._safe(self._lookup_param(sheet, "Sheet Number") or getattr(sheet, "SheetNumber", None))
         return u"{}-{}-{}-{}-{}-{}".format(project_number, s_type, s_organisasjon, s_etasje, s_disiplin, s_number)
 
-    # --- UI data ---
     def _populate(self):
         # 1) Sheet sets
         self.SheetSetsList.Items.Clear()
@@ -145,9 +139,7 @@ class DwgExportWindow(forms.WPFWindow):
             cb.Checked += self._on_sheet_checkbox_toggled
             cb.Unchecked += self._on_sheet_checkbox_toggled
             self.SheetsList.Items.Add(cb)
-
-
-    # --- Events ---
+  
     def _on_set_selected(self, sender, args):
         if self.SheetSetsList.SelectedItem is None:
             any_checked = any(getattr(it, "IsChecked", False) for it in self.SheetsList.Items)
@@ -170,7 +162,9 @@ class DwgExportWindow(forms.WPFWindow):
         has_set = self.SheetSetsList.SelectedItem is not None
         self.ExportBtn.IsEnabled = any_checked or has_set
 
-
+        # Hvis ikke noen avkryssede, fjern valgt sheet set
+        if not any_checked:
+            self.SheetSetsList.SelectedItem = None
 
     def _on_sheets_selected(self, sender, args):
         # Hvis bruker manuelt markerer sheets, lar vi det være gyldig valg også uten sheet set
@@ -207,11 +201,11 @@ class DwgExportWindow(forms.WPFWindow):
         out_folder = dlg.SelectedPath
 
         # 4) Eksporter ett og ett sheet med egendefinert filnavn
-        opts = DWGExportOptions()
+        dwg_opts = DWGExportOptions()
         try:
-            opts.MergedViews = True
-            opts.FileVersion = ACADVersion.R2013
-            opts.SharedCoords = True             # ingen Xref for views på ark
+            dwg_opts.MergedViews = True
+            dwg_opts.FileVersion = ACADVersion.R2013
+            dwg_opts.SharedCoords = True             # ingen Xref for views på ark
         except:
             pass
 
@@ -223,15 +217,12 @@ class DwgExportWindow(forms.WPFWindow):
             base_name = self._sheet_basename(el)   # uten .dwg
             one = ClrList[ElementId]()
             one.Add(eid)
-            if doc.Export(out_folder, base_name, one, opts):
+            if doc.Export(out_folder, base_name, one, dwg_opts):
                 exported += 1
-
+ 
         forms.alert(u"DWG-eksport fullført. {} filer skrevet til:\n{}".format(exported, out_folder),
                     title="Done")
         self.Close()
-
-
-
 
 #  _      ____  _  _     
 # / \__/|/  _ \/ \/ \  /|

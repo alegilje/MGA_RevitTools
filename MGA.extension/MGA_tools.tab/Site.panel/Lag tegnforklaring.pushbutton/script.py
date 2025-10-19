@@ -269,6 +269,7 @@ def collect_topo_vf_keys(view_, crop_on, crop_bb):
     """Returner sett med normaliserte 'View Filter'-nøkler fra toposolids + subdivisions."""
     doc_ = view_.Document
     keys = set()
+    missing = []
     for topo in (FilteredElementCollector(doc_, view_.Id)
                  .OfCategory(BuiltInCategory.OST_Toposolid)
                  .WhereElementIsNotElementType()):
@@ -279,7 +280,16 @@ def collect_topo_vf_keys(view_, crop_on, crop_bb):
         p = topo_element.LookupParameter("View Filter")
         
         if p and p.HasValue:
-            keys.add(key(p.AsString()))
+            
+            if len(p.AsString()) < 1:
+                
+                missing.append(True)
+                
+            else:
+                missing.append(False)
+                keys.add(key(p.AsString()))
+        else:
+            missing.append(True)
         # subdivisions
         for sid in topo.GetSubDivisionIds() or []:
             sub = doc_.GetElement(sid)
@@ -691,6 +701,8 @@ def main():
         uidoc.ActiveView = legend  # så du ser resultatet
         start_pt = XYZ(convert_m_to_internal(0.2), convert_m_to_internal(0.1), 0)
         draw_tegnforklaring(legend, matched_types, start_pt, border_mode="temp")
+
+
 
     # TODO: her kan du tegne selve tegnforklaringen basert på matched_types
 

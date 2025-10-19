@@ -3,7 +3,7 @@ title: Export DWG
 tooltip:
   Date: 30.09.2025
   en_us: |
-      Exporterer til DWG med standard parametere.
+      Export DWG with ACC standard naming.
 
   version: "2.0"
 

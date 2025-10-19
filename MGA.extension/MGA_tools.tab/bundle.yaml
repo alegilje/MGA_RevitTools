@@ -1,9 +1,11 @@
 title: MGA Tools
 layout:
   - Resources
+  - Project
   - Modify
   - Element ID
   - Calculate
   - Working Drawing
   - Site
   - SheetAndRevision
+  - Export
