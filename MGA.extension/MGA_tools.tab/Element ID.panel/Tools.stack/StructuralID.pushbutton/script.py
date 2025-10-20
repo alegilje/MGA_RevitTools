@@ -19,7 +19,7 @@ from collections import defaultdict
 #---------------------------- AUTODESK REVIT AND PYREVIT IMPORTS ----------------------------#
 from Autodesk.Revit.UI import TaskDialog, TaskDialogCommonButtons, TaskDialogResult, TaskDialogCommandLinkId
 from Autodesk.Revit.UI.Selection import ObjectType
-
+from Autodesk.Revit.DB import FilteredElementCollector, BuiltInCategory
 
 #---------------------------------------CUSTOM IMPORTS---------------------------------------#
 from tools._logger import ScriptLogger
@@ -51,83 +51,102 @@ logger = ScriptLogger(name='Renumber Framing Elements ID', log_to_file=True)
 # \_/   \____/\_/  \|\____/  \_/  \_/\____/\_/  \|\____/ FUNCTIONS
 
 #----------------------------------------MAIN------------------------------------------------#
-def main():
-    selected_elements = ask_user_for_scope(uidoc)
-
-    if not selected_elements:
-        TaskDialog.Show("Error", "No elements selected.")
-        logger.info("No elements selected.")
-        return
-    
-    else:
-        elements = [doc.GetElement(eid) for eid in selected_elements if doc.GetElement(eid)]
-        with revit_transaction(doc, "Renumber Framing Elements ID"):
-            grouped = group_elements_by_type_and_length(elements, precision=2)
-            assign_mark_values(doc, grouped)
-            TaskDialog.Show("Success","Renumbering complete.")
-        
-        logger.info("Renumbering complete.")
-
-def ask_user_for_scope(uidoc):
-    """Ask the user if all windows should be processed or only the selected ones."""
-    dialog = TaskDialog("Renumber Framing Elements ID")
-    dialog.MainInstruction = "Select the beams/joists you wish to number?"
-    dialog.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Select manually")
-    dialog.CommonButtons = TaskDialogCommonButtons.Cancel
-
-    result = dialog.Show()
-
-    if result == TaskDialogResult.CommandLink1:
-        return pick_elements(uidoc)
-    else:
-        return None 
+def _feet_to_m(feet_value):
+    return feet_value * 0.3048
 
 
-def pick_elements(uidoc):
-    """Let the user pick windows manually in Revit."""
-    picked_elements = uidoc.Selection.PickObjects(ObjectType.Element, "Select windows")
-    return picked_elements
-
-def round_length(length_value, precision=2):
-    # Rounding the length to the specified precision (e.g., 2 decimal places)
-    return round(length_value, precision)
+def _round_len_m(val_m, precision):
+    # python 2.7 round returns float; ensure stable string sorting later
+    return round(val_m, precision)
 
 
-def get_length_in_meters(element):
-    """Return element length in meters (using Pre-cut Length or Cut Length)."""
-    length_param = element.LookupParameter("Pre-cut Lengde") or element.LookupParameter("Cut Length")
-    if length_param and length_param.HasValue:
-        length_value = length_param.AsDouble()  # stored in feet
-        return length_value * 0.3048  # convert to meters
+def _get_elem_length_m(elem):
+    # Try localized "Pre-cut Lengde" first, then "Cut Length"
+    p = elem.LookupParameter("Pre-cut Lengde")
+    if p is None:
+        p = elem.LookupParameter("Cut Length")
+    if p and p.HasValue:
+        try:
+            return _feet_to_m(p.AsDouble())
+        except:
+            return None
     return None
 
-def group_elements_by_type_and_length(elements, precision=2):
-    """Group elements by type name and rounded length."""
-    type_dict = defaultdict(lambda: defaultdict(list))
-    for element in elements:
-        type_name = element.Name
-        length_value = get_length_in_meters(element)
-        if length_value is not None:
-            rounded_length = round_length(length_value, precision)
-            type_dict[type_name][rounded_length].append(element)
-    return type_dict
+
+def _collect_selected_or_all_framing():
+    sel_ids = uidoc.Selection.GetElementIds()
+    elements = []
+    if sel_ids is not None and sel_ids.Count > 0:
+        # Use only Structural Framing from current selection
+        for eid in sel_ids:
+            e = doc.GetElement(eid)
+            if e and e.Category and e.Category.Id.IntegerValue == int(BuiltInCategory.OST_StructuralFraming):
+                elements.append(e)
+    else:
+        # Nothing selected: get all Structural Framing instances in model
+        elements = list(FilteredElementCollector(doc)
+                        .OfCategory(BuiltInCategory.OST_StructuralFraming)
+                        .WhereElementIsNotElementType()
+                        .ToElements())
+    return elements
 
 
-def assign_mark_values(doc, grouped_elements):
-    """Assign sequential Mark values to grouped elements."""
-    mark_value = 1
-    for type_name, length_groups in sorted(grouped_elements.items()):
-        for length_value, elements_in_group in sorted(length_groups.items()):
-            for element in elements_in_group:
-                mark_param = element.LookupParameter("Mark")
-                if mark_param:
-                    mark_param.Set(str(mark_value))
-                else:
-                    TaskDialog.Show(
-                        "Element {} does not have a 'Mark' parameter.".format(element.Id),
-                        title="Warning"
-                    )
-            mark_value += 1
+def _group_by_type_and_length(elements, precision):
+    # { type_name: { rounded_length_m: [elements...] } }
+    grouped = {}
+    for e in elements:
+        # Skip invalids
+        if e is None:
+            continue
+        length_m = _get_elem_length_m(e)
+        if length_m is None:
+            continue
+        # Type name: use element type name (FamilySymbol.Name)
+        try:
+            t = e.Symbol
+            if t:
+                type_name = t.Name
+            else:
+                type_name = e.Name
+        except:
+            type_name = e.Name
+        rlen = _round_len_m(length_m, precision)
+        if type_name not in grouped:
+            grouped[type_name] = {}
+        if rlen not in grouped[type_name]:
+            grouped[type_name][rlen] = []
+        grouped[type_name][rlen].append(e)
+    return grouped
+
+
+def _assign_mark_values(grouped):
+    # Sequential Mark per (type, rounded length) group
+    mark_val = 1
+    # Sort type names alphabetically; lengths numerically
+    for type_name in sorted(grouped.keys()):
+        length_map = grouped[type_name]
+        # sorted keys of lengths; ensure numeric sort
+        for rlen in sorted(length_map.keys()):
+            elems = length_map[rlen]
+            for e in elems:
+                p = e.LookupParameter("Mark")
+                if p and not p.IsReadOnly:
+                    p.Set(str(mark_val))
+            mark_val += 1
+
+
+def main():
+    elements = _collect_selected_or_all_framing()
+    if not elements:
+        TaskDialog.Show("Renumber Framing Elements ID", "Ingen bjelker funnet (Structural Framing).")
+        return
+    with revit_transaction(doc,"Renumber Framing Elements ID"):
+        grouped = _group_by_type_and_length(elements, precision=2)
+        if not grouped:
+            TaskDialog.Show("Renumber Framing Elements ID", "Fant ingen elementer med gyldig lengde.")
+            return
+        _assign_mark_values(grouped)
+    TaskDialog.Show("Renumber Framing Elements ID", "Nummerering fullført.")
 
 #  _      ____  _  _     
 # / \__/|/  _ \/ \/ \  /|

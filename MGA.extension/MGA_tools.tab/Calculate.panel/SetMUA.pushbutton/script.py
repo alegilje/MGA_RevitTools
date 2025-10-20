@@ -1,7 +1,7 @@
 # encoding: utf-8
 """ 
 Author Alexander Gilje
-title: Set MUA Areal
+title: Get Area Filled Regions
 Date: 05.06.2025
 """
 #  _  _      ____  ____  ____  _____ 
@@ -11,13 +11,14 @@ Date: 05.06.2025
 # \_/\_/  \|\_/   \____/\_/\_\  \_/ IMPORTS
 #----------------------------------STANDARD LIBRARY IMPORTS----------------------------------#
 
+#---------------------------- AUTODESK REVIT AND PYREVIT IMPORTS ----------------------------#
 from pyrevit import revit, DB
 
 from Autodesk.Revit.DB import BuiltInCategory, BuiltInParameter, FilteredElementCollector, StorageType, UnitUtils, UnitTypeId
-
+from Autodesk.Revit.UI import TaskDialog
+#---------------------------------------CUSTOM IMPORTS---------------------------------------#
 from formsWindow._forms import dialogwindow_TextInput
 from tools._transactions import revit_transaction
-from Autodesk.Revit.UI import TaskDialog
 
 #  _     ____  ____  _  ____  ____  _     _____ ____ 
 # / \ |\/  _ \/  __\/ \/  _ \/  __\/ \   /  __// ___\
@@ -37,72 +38,93 @@ view = doc.ActiveView
 
 #----------------------------------------MAIN------------------------------------------------#
 def main():
+    filled_regions_in_view = FilteredElementCollector(doc, view.Id).OfCategory(BuiltInCategory.OST_DetailComponents).WhereElementIsNotElementType()
+    
+    if filled_regions_in_view:
+        filled_regions_in_view_length = len(list(filled_regions_in_view))
+        if filled_regions_in_view_length > 1:
+            search_word = dialogwindow_TextInput("MUA", "Skriv inn hele eller deler av ordet fra kommentarfeltet (Comments).\n For eksempel: Skriv 'MUA' for å hente alle med 'MUA' i kommentaren (som 'MUA 1', 'MUA 2'),\n eller skriv 'MUA 1' for å hente kun de med nøyaktig 'MUA 1'. Ved tomt felt blir alle hentet:", "Hva skal du ha arealet av")
+            if not search_word or search_word.lower() == "alle":
+                search_word = "Alle"
 
-    search_word = dialogwindow_TextInput("MUA", "Skriv inn hele eller deler av ordet fra kommentarfeltet (Comments).\n For eksempel: Skriv 'MUA' for å hente alle med 'MUA' i kommentaren (som 'MUA 1', 'MUA 2'),\n eller skriv 'MUA 1' for å hente kun de med nøyaktig 'MUA 1'.:", "Hva skal du ha arealet av")
-    collector = FilteredElementCollector(doc, view.Id).OfCategory(BuiltInCategory.OST_DetailComponents).WhereElementIsNotElementType()
+            filled_regions = [el for el in filled_regions_in_view if isinstance(el, DB.FilledRegion)]
 
-    filled_regions = [el for el in collector if isinstance(el, DB.FilledRegion)]
-    if filled_regions:
-        # Filterer på "search_word" i Comments
-        filtered = []
-        omkretser = []
+            length_count = 0
+            area_count = 0
 
-        for fr in filled_regions:
-            comment = fr.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)
-            if comment:
-                comment_str = comment.AsString()
-                if comment_str and not "demo" in comment_str.lower() and str(search_word).lower() in comment_str.lower():
-                    boundaries = fr.GetBoundaries()
-                    omkrets = 0.0
-                    for loop in boundaries:
-                        omkrets += loop.GetExactLength()
-                    omkretser.append(omkrets)
-                    filtered.append(fr)
-        
-        if filtered:
+            if search_word == "Alle":
+                for fr in filled_regions:
+                    comments = check_comments(fr)
+                    if not "demo" in comments.lower():
 
-            reported_lines = []
-            for fr,omkrets in zip(filtered,omkretser):
-                # Hent area i m²
-                area_param = fr.get_Parameter(BuiltInParameter.HOST_AREA_COMPUTED)
-                if area_param and area_param.StorageType == StorageType.Double:
-                    area_m2 = UnitUtils.ConvertFromInternalUnits(area_param.AsDouble(), UnitTypeId.SquareMeters)
+                        areal_param = fr.LookupParameter("Areal")
+                        length_param = fr.LookupParameter("Omkrets")
 
-                # Finn "Areal"-parameter
-                    areal_param = fr.LookupParameter("Areal")
-                    length_param = fr.LookupParameter("Omkrets")
-                    if areal_param and length_param:
-                        
-                        with revit_transaction(doc, "Set Areal og Omkrets"):
-                            areal_param.Set(area_m2)
-                            length_param.Set(omkrets)
-                            reported_lines.append("{}: Areal og Omkrets".format(fr.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS).AsString()))
+                        if areal_param and length_param:
 
-                    elif length_param:
-                        with revit_transaction(doc, "Set Omkrets"):
-                            length_param.Set(omkrets)
-                            reported_lines.append("Omkrets for comment {} er Oppdatert".format(fr.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS).AsString()))
+                            with revit_transaction(doc,"Sett areal og omkrets"):
+                                areal_param.Set(get_total_area(fr))
+                                length_param.Set(get_total_length(fr))
+                                length_count += 1
+                                area_count += 1
 
-                    elif areal_param:
-                        with revit_transaction(doc, "Set Areal"):
-                            areal_param.Set(area_m2)
-                            reported_lines.append("Areal for comment {} er Oppdatert".format(fr.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS).AsString()))
-                    
-                    else:
-                        reported_lines.append("Ingen parameter funnet for: {}".format(fr.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS).AsString()))
-                                
-            if reported_lines:
-                reported_lines.insert(0, "Dette er oppdatert(Comment verdi, Parameter):")
-                report_lines = [reported_lines[0]] + ["    " + line for line in reported_lines[1:]]
-                result_message = "\n".join(report_lines)
+                        elif length_param:    
+                            with revit_transaction(doc,"Sett omkrets"):
+                                length_param.Set(get_total_length(fr))
+                                length_count += 1
+
+                        elif areal_param:
+                            with revit_transaction(doc,"Sett areal"):
+                                areal_param.Set(get_total_area(fr))
+                                area_count += 1
+
             else:
-                result_message = "Ingen parameter funnet. Legg til parametere, Omkrets og/eller Areal i filled region og prøv igjen."
+                for fr in filled_regions:
+                    comments = check_comments(fr)
+                    if not "demo" in comments.lower() and str(search_word).lower() in comments.lower():
+                        areal_param = fr.LookupParameter("Areal")
+                        length_param = fr.LookupParameter("Omkrets")
 
-            TaskDialog.Show("Resultat",result_message)
+                        if areal_param and length_param:
+
+                            with revit_transaction(doc,"Sett areal og omkrets"):
+                                areal_param.Set(get_total_area(fr))
+                                length_param.Set(get_total_length(fr))
+                                length_count += 1
+                                area_count += 1
+
+                        elif length_param:    
+                            with revit_transaction(doc,"Sett omkrets"):
+                                length_param.Set(get_total_length(fr))
+                                length_count += 1
+
+                        elif areal_param:
+                            with revit_transaction(doc,"Sett areal"):
+                                areal_param.Set(get_total_area(fr))
+                                area_count += 1
+
+            TaskDialog.Show("Success","Satt areal på {}, og omkrets på {} filled regions.".format(area_count, length_count))
         else:
-            TaskDialog.Show("Feil", "Ingen Filled Region med verdien {} i Comments funnet".format(search_word))
+            TaskDialog.Show("Feil","Ingen filled regions i viewet.") 
     else:
-        TaskDialog.Show("Feil", "Ingen Filled Region funnet")
+        TaskDialog.Show("Feil","Ingen filled regions i viewet.")
+   
+
+
+def get_total_length(filled_region):
+    total_length = 0.0
+    for loop in filled_region.GetBoundaries():
+        total_length += loop.GetExactLength()
+    return total_length
+
+def get_total_area(filled_region):
+    area_param = filled_region.get_Parameter(BuiltInParameter.HOST_AREA_COMPUTED)
+    if area_param and area_param.StorageType == StorageType.Double:
+        return UnitUtils.ConvertFromInternalUnits(area_param.AsDouble(), UnitTypeId.SquareMeters)
+
+def check_comments(filled_region):
+    comment = filled_region.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)
+    return comment.AsString() if comment else None
 #  _      ____  _  _     
 # / \__/|/  _ \/ \/ \  /|
 # | |\/||| / \|| || |\ ||

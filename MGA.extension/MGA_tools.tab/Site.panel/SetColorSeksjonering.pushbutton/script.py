@@ -10,12 +10,23 @@ Date: 26.03.2025
 # | || |  |||  __/| \_/||    /  | |  
 # \_/\_/  \|\_/   \____/\_/\_\  \_/ IMPORTS
 #----------------------------------STANDARD LIBRARY IMPORTS----------------------------------#
-import os, wpf, clr
+import os, clr
 clr.AddReference("System")
-from System.Windows import Window, Visibility
+
+clr.AddReference("PresentationFramework")
+clr.AddReference("RevitAPI")
+import clr
+
+# Sørg for riktige WPF-assemblyreferanser før import
+try:
+    from System.Windows import Visibility
+except:
+    clr.AddReference('WindowsBase')              # <- nødvendig for System.Windows.Visibility
+    clr.AddReference('PresentationCore')         # ofte nyttig for andre WPF-typer
+    clr.AddReference('PresentationFramework') 
 from System.ComponentModel import CancelEventArgs
 from System.Windows.Controls import CheckBox
-from pyrevit import revit, DB
+from pyrevit import revit, DB, forms
 
 from Autodesk.Revit.DB import BuiltInCategory, BuiltInParameter, FilteredElementCollector, FillPatternElement, Color, OverrideGraphicSettings, ElementType, FilledRegion, FilledRegionType, ElementId, Element
 from Autodesk.Revit.UI import\
@@ -147,7 +158,7 @@ def parse_color(rgb_string):
 
 #-----------------------------------FORM CLASS-----------------------------------------------#
 
-class Seksjonering(Window):
+class Seksjonering(forms.WPFWindow):
     def __init__(self,doc,uiapp):
 
         path_xaml_file = os.path.join(os.path.dirname(__file__), "FormUI.xaml")
@@ -156,7 +167,7 @@ class Seksjonering(Window):
             raise FileNotFoundError("XAML file not found at {}".format(path_xaml_file))
         
         # Load form
-        wpf.LoadComponent(self, path_xaml_file)
+        forms.WPFWindow.__init__(self, path_xaml_file) #LoadComponent(self, path_xaml_file)
         self.doc = doc
         self.uiapp = uiapp
 
@@ -169,7 +180,7 @@ class Seksjonering(Window):
 
     
     def UI_ok_button_Click(self, sender, e):
-        print("Hello World")
+        
         self.Close()
 
 

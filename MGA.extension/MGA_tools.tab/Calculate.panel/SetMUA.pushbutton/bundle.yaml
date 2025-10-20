@@ -1,7 +1,7 @@
 # encoding: utf-8
 title: |
   Get Area 
-  Filed Region
+  Filled Region
 tooltip: 
   Date: 06.08.2025
   en_us: |
@@ -30,8 +30,7 @@ tooltip:
         skal hentes, skriver du 'MUA 1' i feltet. Da vil bare 'MUA 1' 
         bli hentet og satt parameter på.
 
-      Version: 2.0
-      Author: Alexander Gilje
+
 
 
   version: "2.0"
