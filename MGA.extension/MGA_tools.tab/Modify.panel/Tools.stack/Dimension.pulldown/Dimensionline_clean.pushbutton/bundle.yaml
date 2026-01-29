@@ -1,0 +1,17 @@
+# encoding: utf-8
+title: |
+  Clean
+  Dimension lines
+tooltip:
+  Date: 28.01.2026
+  en_us: |
+      Flytter tall som overlapper på mållinjer. 
+      Hvis du ønsker og fikse på en mållinje, så velger du den før du trykker på knappen.
+      ellers tar den alle.
+
+
+  version: "1.0"
+
+Last Update: 2026
+
+Author: Alexander Gilje

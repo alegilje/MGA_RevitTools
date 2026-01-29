@@ -18,7 +18,7 @@ clr.AddReference("WindowsBase")
 from System.Windows import Window
 
 #---------------------------- AUTODESK REVIT AND PYREVIT IMPORTS ----------------------------#
-from Autodesk.Revit.DB import Plane, SketchPlane, ModelCurve, Line, Arc, XYZ
+from Autodesk.Revit.DB import Plane, SketchPlane, ModelCurve, Line, Arc, XYZ, UnitUtils, UnitTypeId
 from Autodesk.Revit.UI.Selection import ObjectType
 from pyrevit import revit, forms
 
@@ -52,54 +52,57 @@ logger = ScriptLogger(name='SetHeightModelLine', log_to_file=True)
 #----------------------------------------MAIN------------------------------------------------#
 
 def main():
-    form = HeightForm()
-    form.ShowDialog()
-    if form.result:
-        z_mm = form.result
-        try:
-            new_z = float(z_mm) / 304.8  # konverter mm til fot
-        except:
-            forms.alert("Ugyldig tall.", exitscript=True)
+    mc = None
+    p1z_mm = 0.0
+    p2z_mm = 0.0
+    try:
+        sel_ids = list(uidoc.Selection.GetElementIds())
+        if len(sel_ids) == 1:
+            el = doc.GetElement(sel_ids[0])
+            if isinstance(el, ModelCurve):
+                mc = el
+                crv = mc.GeometryCurve
+                p1 = crv.GetEndPoint(0)
+                p2 = crv.GetEndPoint(1)
+                p1z_mm = UnitUtils.ConvertFromInternalUnits(p1.Z, UnitTypeId.Millimeters)
+                p2z_mm = UnitUtils.ConvertFromInternalUnits(p2.Z, UnitTypeId.Millimeters)
+    except:
+        pass
+    # Require that the user has selected a ModelCurve (linje) first
+    if mc is None:
+        forms.alert(u"Vennligst velg én modellinje (ModelCurve) før du kjører verktøyet.", exitscript=True)
+        return
 
-        # La bruker velge ModelCurves
-        refs = uidoc.Selection.PickObjects(ObjectType.Element, "Velg model lines/arcs")
-        elements = [doc.GetElement(r.ElementId) for r in refs]
+    dlg = ZDialog(p1z_mm, p2z_mm)
+    if dlg.show():
+        new_p1_mm = dlg.p1_mm
+        new_p2_mm = dlg.p2_mm
 
-        with revit.Transaction("Flytt ModelCurves til ny Z"):
-            # Lag nytt plan i riktig høyde
-            plane = Plane.CreateByNormalAndOrigin(XYZ.BasisZ, XYZ(0,0,new_z))
-            sketchplane = SketchPlane.Create(doc, plane)
+        # --- Bruk verdiene (mm -> internal feet) ---
+        new_p1_ft = UnitUtils.ConvertToInternalUnits(new_p1_mm, UnitTypeId.Millimeters)
+        new_p2_ft = UnitUtils.ConvertToInternalUnits(new_p2_mm, UnitTypeId.Millimeters)
 
-            for el in elements:
-                if isinstance(el, ModelCurve):
-                    curve = el.GeometryCurve
+        if mc:
+            # Flytt endepunkter på valgt ModelCurve til angitt Z
+            crv = mc.GeometryCurve
+            p1 = crv.GetEndPoint(0)
+            p2 = crv.GetEndPoint(1)
+            p1n = XYZ(p1.X, p1.Y, new_p1_ft)
+            p2n = XYZ(p2.X, p2.Y, new_p2_ft)
 
-                    if isinstance(curve, Line):
-                        # Rett linje
-                        start = curve.GetEndPoint(0)
-                        end = curve.GetEndPoint(1)
-                        new_curve = Line.CreateBound(
-                            XYZ(start.X, start.Y, new_z),
-                            XYZ(end.X, end.Y, new_z)
-                        )
-
-                    elif isinstance(curve, Arc):
-                        # Bue
-                        start = curve.GetEndPoint(0)
-                        end = curve.GetEndPoint(1)
-                        mid = curve.Evaluate(0.5, True)
-                        new_curve = Arc.Create(
-                            XYZ(start.X, start.Y, new_z),
-                            XYZ(end.X, end.Y, new_z),
-                            XYZ(mid.X, mid.Y, new_z)
-                        )
-                    else:
-                        continue
-
-                    # Lag ny ModelCurve på ønsket plan
-                    doc.Create.NewModelCurve(new_curve, sketchplane)
-                    # Slett gammel
-                    doc.Delete(el.Id)
+            with revit.Transaction('Sett Z på modellinje'):
+                try:
+                    # Skap ny kurve med samme type
+                    new_crv = Line.CreateBound(p1n, p2n)
+                    mc.SetGeometryCurve(new_crv, True)
+                except:
+                    # fallback for ikke-lineære kurver: flytt ved hjelp av Translate
+                    dz1 = new_p1_ft - p1.Z
+                    dz2 = new_p2_ft - p2.Z
+                    # Hvis ulik Z, gjør en enkel rekonstruksjon:
+                    new_crv = Line.CreateBound(XYZ(p1.X, p1.Y, p1.Z + dz1),
+                                                XYZ(p2.X, p2.Y, p2.Z + dz2))
+                    mc.SetGeometryCurve(new_crv, True)
 
 #  ____  _     ____  ____  ____  _____ ____ 
 # /   _\/ \   /  _ \/ ___\/ ___\/  __// ___\
@@ -107,30 +110,48 @@ def main():
 # |  \__| |_/\| |-||\___ |\___ ||  /_ \___ |
 # \____/\____/\_/ \|\____/\____/\____\\____/ CLASSES
 import wpf
-class HeightForm(Window):
-    def __init__(self):
+class ZDialog(forms.WPFWindow):
+    def __init__(self, p1_init, p2_init):
         path_xaml_file = os.path.join(os.path.dirname(__file__), "FormUI.xaml")
         if not os.path.exists(path_xaml_file):
             raise FileNotFoundError("XAML file not found at {}".format(path_xaml_file))
-
-        # Last inn XAML
         wpf.LoadComponent(self, path_xaml_file)
+        # init verdier
+        self.P1Box.Text = ('{0:.3f}'.format(p1_init)).rstrip('0').rstrip('.')
+        self.P2Box.Text = ('{0:.3f}'.format(p2_init)).rstrip('0').rstrip('.')
+        # hvis P1==P2 => default "samme"
+        if abs(p1_init - p2_init) < 1e-6:
+            self.SameAsP1.IsChecked = True
+            self.P2Box.IsEnabled = False
+            self.P2Box.Text = self.P1Box.Text
+        # events
+        self.SameAsP1.Checked += self._sync_on
+        self.SameAsP1.Unchecked += self._sync_off
+        self.P1Box.TextChanged += self._p1_changed
+        self.OkButton.Click += self._ok
+        self.CancelButton.Click += self._cancel
 
-        # Event handlers
-        self.OkButton.Click += self.on_ok
-        self.CancelButton.Click += self.on_cancel
-        self.result = None
+    def _sync_on(self, sender, args):
+        self.P2Box.IsEnabled = False
+        self.P2Box.Text = self.P1Box.Text
 
-    def on_ok(self, sender, args):
+    def _sync_off(self, sender, args):
+        self.P2Box.IsEnabled = True
+
+    def _p1_changed(self, sender, args):
+        if self.SameAsP1.IsChecked:
+            self.P2Box.Text = self.P1Box.Text
+
+    def _ok(self, sender, args):
         try:
-            self.result = float(self.ZBox.Text)
-            self.Close()
+            self.p1_mm = float(self.P1Box.Text.replace(',', '.'))
+            self.p2_mm = float(self.P2Box.Text.replace(',', '.')) if not self.SameAsP1.IsChecked else self.p1_mm
+            self.DialogResult = True
         except:
-            from pyrevit import forms
-            forms.alert("Ugyldig tall!")
+            forms.alert('Ugyldig tall. Bruk punktum eller komma.', exitscript=False)
 
-    def on_cancel(self, sender, args):
-        self.Close()
+    def _cancel(self, sender, args):
+        self.DialogResult = False
 
 #  _      ____  _  _     
 # / \__/|/  _ \/ \/ \  /|
